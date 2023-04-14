@@ -1,5 +1,5 @@
 #![allow(non_snake_case)]
-use image::{DynamicImage, GenericImage, GenericImageView};
+use image::DynamicImage;
 use rayon::prelude::*;
 
 pub struct PixelSorterSettings {

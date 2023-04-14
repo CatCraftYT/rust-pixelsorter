@@ -25,7 +25,7 @@ impl Default for PixelSorter {
 
 impl PixelSorter {
     /// Called once before the first frame.
-    pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
+    pub fn new(_cc: &eframe::CreationContext<'_>) -> Self {
         Default::default()
     }
 
@@ -48,6 +48,13 @@ impl eframe::App for PixelSorter {
         egui::TopBottomPanel::top("menu_bar").show(ctx, |ui| {
             egui::menu::bar(ui, |ui| {
                 ui.menu_button("File", |ui| {
+                    if ui.button("Save").clicked() && self.processedImage.is_some() {
+                        let path = GetSavePath();
+                        if path.is_some() {
+                            self.processedImage.as_ref().unwrap().save(path.unwrap());
+                        }
+                    }
+
                     if ui.button("Open").clicked() {
                         let img = OpenImgFileWithDialog();
                         if img.is_some() {
@@ -127,7 +134,7 @@ impl eframe::App for PixelSorter {
 
 fn OpenImgFileWithDialog() -> Option<image::DynamicImage> {
     let path = FileDialog::new()
-    //.add_filter("Image files", &["PNG, JPEG, JPG, BMP, GIF, WEBP, TIFF, TGA"])
+    .add_filter("Image files", &["png", "jpeg", "jpg", "bmp", "gif", "webp", "tiff", "tga"])
     .show_open_single_file().unwrap();
 
     if path.is_none() { return None; }
@@ -137,4 +144,10 @@ fn OpenImgFileWithDialog() -> Option<image::DynamicImage> {
         return None;
     }
     return Some(image.unwrap());
+}
+
+fn GetSavePath() -> Option<std::path::PathBuf> {
+    return FileDialog::new()
+    .add_filter("Image files", &["png", "jpeg", "jpg", "bmp", "gif", "webp", "tiff", "tga"])
+    .show_save_single_file().unwrap();
 }

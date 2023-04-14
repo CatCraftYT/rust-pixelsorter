@@ -9,7 +9,7 @@ fn main() -> eframe::Result<()> {
 
     let native_options = eframe::NativeOptions::default();
     eframe::run_native(
-        "eframe template",
+        "Pixel Sorter",
         native_options,
         Box::new(|cc| Box::new(pixelsorter::PixelSorter::new(cc))),
     )
