@@ -76,6 +76,19 @@ impl eframe::App for PixelSorter {
 
             ui.add_enabled_ui(self.originalImageBytes.is_some(), |ui| {
                 ui.checkbox(&mut self.settings.vertical, "Vertical").on_hover_text("If this is true, pixels will be sorted vertically. If not, the pixels will be sorted horizontally.");
+
+                egui::ComboBox::from_label("Sorting mode")
+                .selected_text(format!("{:?}", self.settings.sortMode))
+                .show_ui(ui, |ui| {
+                    ui.selectable_value(&mut self.settings.sortMode, crate::sorter::SortMode::Red, "Red");
+                    ui.selectable_value(&mut self.settings.sortMode, crate::sorter::SortMode::Green, "Green");
+                    ui.selectable_value(&mut self.settings.sortMode, crate::sorter::SortMode::Blue, "Blue");
+                    ui.selectable_value(&mut self.settings.sortMode, crate::sorter::SortMode::Hue, "Hue");
+                    ui.selectable_value(&mut self.settings.sortMode, crate::sorter::SortMode::Saturation, "Saturation");
+                    ui.selectable_value(&mut self.settings.sortMode, crate::sorter::SortMode::Lightness, "Lightness");
+                });
+
+                ui.separator();
                 
                 ui.add(egui::Slider::new(&mut self.settings.threshold.end, self.settings.threshold.start..=255).clamp_to_range(true).text("Threshold max"));
                 ui.add(egui::Slider::new(&mut self.settings.threshold.start, 0..=self.settings.threshold.end).clamp_to_range(true).text("Threshold min"));
@@ -96,6 +109,8 @@ impl eframe::App for PixelSorter {
                         self.UpdateImage(ctx);
                     }
                 });
+
+                ui.separator();
 
                 if ui.button("Sort!").clicked() {
                     self.settings.showThresholds = false;
@@ -143,7 +158,9 @@ fn OpenImgFileWithDialog() -> Option<image::DynamicImage> {
     if image.is_err() {
         return None;
     }
-    return Some(image.unwrap());
+
+    // probably inefficient but the image needs to be in rgba8 format otherwise the sorter shits itself and dies (and so do i)
+    return Some(image::DynamicImage::from(image.unwrap().into_rgba8()));
 }
 
 fn GetSavePath() -> Option<std::path::PathBuf> {
