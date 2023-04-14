@@ -26,8 +26,6 @@ impl Default for PixelSorter {
 impl PixelSorter {
     /// Called once before the first frame.
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
-        // This is also where you can customize the look and feel of egui using
-        // `cc.egui_ctx.set_visuals` and `cc.egui_ctx.set_fonts`.
         Default::default()
     }
 
@@ -46,19 +44,10 @@ impl PixelSorter {
 }
 
 impl eframe::App for PixelSorter {
-    /// Called each time the UI needs repainting, which may be many times per second.
-    /// Put your widgets into a `SidePanel`, `TopPanel`, `CentralPanel`, `Window` or `Area`.
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        // Examples of how to create different panels and windows.
-        // Pick whichever suits you.
-        // Tip: a good default choice is to just keep the `CentralPanel`.
-        // For inspiration and more examples, go to https://emilk.github.io/egui
-
         egui::TopBottomPanel::top("menu_bar").show(ctx, |ui| {
-            // The top panel is often a good place for a menu bar:
             egui::menu::bar(ui, |ui| {
                 ui.menu_button("File", |ui| {
-                    #[cfg(not(target_arch = "wasm32"))] // no File->Quit on web pages!
                     if ui.button("Open").clicked() {
                         let img = OpenImgFileWithDialog();
                         if img.is_some() {
@@ -83,9 +72,26 @@ impl eframe::App for PixelSorter {
                 
                 ui.add(egui::Slider::new(&mut self.settings.threshold.end, self.settings.threshold.start..=255).clamp_to_range(true).text("Threshold max"));
                 ui.add(egui::Slider::new(&mut self.settings.threshold.start, 0..=self.settings.threshold.end).clamp_to_range(true).text("Threshold min"));
-                ui.checkbox(&mut self.settings.showThresholds, "Show thresholds").on_hover_text("Show the thresholds for sorting. Rows of white pixels will be sorted, black pixels will not be affected.");
+
+                ui.horizontal(|ui| {
+                    if ui.checkbox(&mut self.settings.showThresholds, "Show thresholds").on_hover_text("Show the thresholds for sorting. Rows of white pixels will be sorted, black pixels will not be affected.").changed() {
+                        self.processedImage = self.originalImageBytes.clone();
+                        if self.settings.showThresholds {
+                            crate::sorter::ThresholdImage(self.processedImage.as_mut().unwrap(), &self.settings);
+    
+                        }
+                        self.UpdateImage(ctx);
+                    };
+                    ui.separator();
+                    if ui.button("Update").clicked() && self.settings.showThresholds {
+                        self.processedImage = self.originalImageBytes.clone();
+                        crate::sorter::ThresholdImage(self.processedImage.as_mut().unwrap(), &self.settings);
+                        self.UpdateImage(ctx);
+                    }
+                });
 
                 if ui.button("Sort!").clicked() {
+                    self.settings.showThresholds = false;
                     self.processedImage = self.originalImageBytes.clone();
                     crate::sorter::SortImage(self.processedImage.as_mut().unwrap(), &self.settings);
                     self.UpdateImage(ctx);

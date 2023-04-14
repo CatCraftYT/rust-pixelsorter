@@ -18,6 +18,14 @@ impl Default for PixelSorterSettings {
     }
 }
 
+pub fn ThresholdImage(img: &mut DynamicImage, settings : &PixelSorterSettings) {
+    let rgbImg = img.as_mut_rgb8().unwrap();
+    rgbImg.pixels_mut().par_bridge().for_each(|pixel| {
+        let px = if settings.threshold.contains(&GetPixelLuminance(&*pixel)) {255} else {0};
+        *pixel = image::Rgb::from([px,px,px]);
+    })
+}
+
 pub fn SortImage(img: &mut DynamicImage, settings : &PixelSorterSettings) {
     if settings.vertical { *img = img.rotate90(); }
     let rgbImg = img.as_mut_rgb8().unwrap();
@@ -60,8 +68,6 @@ fn SortPixelsInLine(line: &mut Vec<&mut image::Rgb<u8>>, settings : &PixelSorter
     }
 
     for pixel in 0..newLine.len() {
-        //let px = if settings.threshold.contains(&GetPixelLuminance(&*line[pixel])) {255} else {0};
-        //*line[pixel] = image::Rgb::from([px, px, px]);
         *line[pixel] = newLine[pixel];
     }
 }
