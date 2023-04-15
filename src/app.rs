@@ -71,23 +71,34 @@ impl eframe::App for PixelSorter {
             });
         });
 
-        egui::SidePanel::left("settings_panel").show(ctx, |ui| {
-            ui.heading("Pixel Sorter Settings");
-
+        egui::SidePanel::left("settings_panel").resizable(false).show(ctx, |ui| {
             ui.add_enabled_ui(self.originalImageBytes.is_some(), |ui| {
-                ui.checkbox(&mut self.settings.vertical, "Vertical").on_hover_text("If this is true, pixels will be sorted vertically. If not, the pixels will be sorted horizontally.");
-
-                egui::ComboBox::from_label("Sorting mode")
-                .selected_text(format!("{:?}", self.settings.sortMode))
-                .show_ui(ui, |ui| {
-                    ui.selectable_value(&mut self.settings.sortMode, crate::sorter::SortMode::Average, "Average");
-                    ui.selectable_value(&mut self.settings.sortMode, crate::sorter::SortMode::Red, "Red");
-                    ui.selectable_value(&mut self.settings.sortMode, crate::sorter::SortMode::Green, "Green");
-                    ui.selectable_value(&mut self.settings.sortMode, crate::sorter::SortMode::Blue, "Blue");
-                    ui.selectable_value(&mut self.settings.sortMode, crate::sorter::SortMode::Hue, "Hue");
-                    ui.selectable_value(&mut self.settings.sortMode, crate::sorter::SortMode::Saturation, "Saturation");
-                    ui.selectable_value(&mut self.settings.sortMode, crate::sorter::SortMode::Lightness, "Lightness");
+                ui.horizontal(|ui| {
+                    ui.label("Sorting direction");
+                    ui.separator();
+                    ui.radio_value(&mut self.settings.vertical, false, "Horizontal");
+                    ui.radio_value(&mut self.settings.vertical, true, "Vertical");
                 });
+
+                ui.horizontal(|ui| {
+                    ui.label("Sorting mode");
+                    ui.add_space(16.5);
+                    ui.separator();
+                    // no label so that we can add custom label on the left
+                    egui::ComboBox::from_id_source("Sorting mode")
+                    .selected_text(format!("{:?}", self.settings.sortMode))
+                    .show_ui(ui, |ui| {
+                        ui.selectable_value(&mut self.settings.sortMode, crate::sorter::SortMode::Average, "Average");
+                        ui.selectable_value(&mut self.settings.sortMode, crate::sorter::SortMode::Red, "Red");
+                        ui.selectable_value(&mut self.settings.sortMode, crate::sorter::SortMode::Green, "Green");
+                        ui.selectable_value(&mut self.settings.sortMode, crate::sorter::SortMode::Blue, "Blue");
+                        ui.selectable_value(&mut self.settings.sortMode, crate::sorter::SortMode::Hue, "Hue");
+                        ui.selectable_value(&mut self.settings.sortMode, crate::sorter::SortMode::Saturation, "Saturation");
+                        ui.selectable_value(&mut self.settings.sortMode, crate::sorter::SortMode::Lightness, "Lightness");
+                    });
+                });
+
+                ui.checkbox(&mut self.settings.invert, "Invert sorting direction").on_hover_text("If this is unchecked, pixels will be sorted darkest to lightest. If it is checked, they will be sorted lightest to darkest.");
 
                 ui.separator();
                 
@@ -113,10 +124,17 @@ impl eframe::App for PixelSorter {
 
                 ui.separator();
 
-                if ui.button("Sort!").clicked() {
+                let sortButton = egui::Button::new("Sort!");
+                if ui.add_sized(egui::vec2(ui.available_width(), 10.0), sortButton).clicked() {
                     self.settings.showThresholds = false;
                     self.processedImage = self.originalImageBytes.clone();
                     crate::sorter::SortImage(self.processedImage.as_mut().unwrap(), &self.settings);
+                    self.UpdateImage(ctx);
+                }
+
+                let resetButton = egui::Button::new("Reset");
+                if ui.add_sized(egui::vec2(ui.available_width(), 10.0), resetButton).clicked() {
+                    self.processedImage = self.originalImageBytes.clone();
                     self.UpdateImage(ctx);
                 }
             });

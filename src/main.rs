@@ -12,7 +12,6 @@ fn main() -> eframe::Result<()> {
 
     let mut native_options = eframe::NativeOptions::default();
     native_options.icon_data = Some(icon);
-    native_options.maximized = true;
 
     eframe::run_native(
         "Pixel Sorter",

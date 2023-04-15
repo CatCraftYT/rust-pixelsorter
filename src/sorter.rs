@@ -31,26 +31,12 @@ pub enum SortMode {
     Lightness
 }
 
-/*
-impl std::fmt::Display for SortMode {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            SortMode::Red => { write!(f, "Red") }
-            SortMode::Green => { write!(f, "Green") }
-            SortMode::Blue => { write!(f, "Blue") }
-            SortMode::Hue => { write!(f, "Hue") }
-            SortMode::Saturation => { write!(f, "Saturation") }
-            SortMode::Lightness => { write!(f, "Lightness") }
-        }
-    }
-}
-*/
-
 pub struct PixelSorterSettings {
     pub vertical: bool,  // whether the image should be sorted horizontally or vertically
     pub threshold: Threshold,
     pub showThresholds: bool,
-    pub sortMode: SortMode
+    pub sortMode: SortMode,
+    pub invert: bool
 }
 
 impl Default for PixelSorterSettings {
@@ -59,7 +45,8 @@ impl Default for PixelSorterSettings {
             vertical: false,
             threshold: Threshold::new(127, 223),
             showThresholds: false,
-            sortMode: SortMode::Lightness
+            sortMode: SortMode::Lightness,
+            invert: false
         }
     }
 }
@@ -103,7 +90,7 @@ fn SortPixelsInLine(line: &mut Vec<&mut image::Rgba<u8>>, settings : &PixelSorte
     for span in spans.iter_mut() {
         let presortSpan = span.clone();
         // each span is a list of indices into line, not pixel values
-        span.sort_unstable_by(|a, b| { GetPixelSortingNumber(&*line[*a], settings).partial_cmp(&GetPixelSortingNumber(&*line[*b], settings)).unwrap_or(std::cmp::Ordering::Equal) });
+        span.sort_unstable_by(|a, b| { GetPixelOrdering(&*line[*a], &*line[*b], settings) });
         for i in 0..span.len() {
             transformations.push((presortSpan[i], span[i]));
         }
@@ -117,6 +104,12 @@ fn SortPixelsInLine(line: &mut Vec<&mut image::Rgba<u8>>, settings : &PixelSorte
     for pixel in 0..newLine.len() {
         *line[pixel] = newLine[pixel];
     }
+}
+
+fn GetPixelOrdering(a: &image::Rgba<u8>, b: &image::Rgba<u8>, settings : &PixelSorterSettings) -> std::cmp::Ordering {
+    let order = GetPixelSortingNumber(a, settings).partial_cmp(&GetPixelSortingNumber(b, settings)).unwrap_or(std::cmp::Ordering::Equal);
+    if settings.invert { return order.reverse(); }
+    return order;
 }
 
 /// Returns the number that a pixel should be sorted by.
