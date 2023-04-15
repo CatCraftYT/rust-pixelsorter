@@ -2,8 +2,27 @@
 use image::DynamicImage;
 use rayon::prelude::*;
 
+pub struct Threshold {
+    pub min: u8,
+    pub max: u8
+}
+
+impl Threshold {
+    fn contains(&self, value: &u8) -> bool {
+        return *value >= self.min && *value <= self.max;
+    }
+
+    fn new(min: u8, max: u8) -> Self {
+        return Self {
+            min: min,
+            max: max
+        }
+    }
+}
+
 #[derive(Debug, PartialEq)]
 pub enum SortMode {
+    Average,
     Red,
     Green,
     Blue,
@@ -29,7 +48,7 @@ impl std::fmt::Display for SortMode {
 
 pub struct PixelSorterSettings {
     pub vertical: bool,  // whether the image should be sorted horizontally or vertically
-    pub threshold: std::ops::Range<u8>,
+    pub threshold: Threshold,
     pub showThresholds: bool,
     pub sortMode: SortMode
 }
@@ -38,7 +57,7 @@ impl Default for PixelSorterSettings {
     fn default() -> Self {
         Self {
             vertical: false,
-            threshold: std::ops::Range {start: 127, end: 223},
+            threshold: Threshold::new(127, 223),
             showThresholds: false,
             sortMode: SortMode::Lightness
         }
@@ -48,7 +67,7 @@ impl Default for PixelSorterSettings {
 pub fn ThresholdImage(img: &mut DynamicImage, settings : &PixelSorterSettings) {
     let rgbImg = img.as_mut_rgba8().unwrap();
     rgbImg.pixels_mut().par_bridge().for_each(|pixel| {
-        let px = if settings.threshold.contains(&GetPixelLuminance(&*pixel)) {255} else {0};
+        let px = if settings.threshold.contains(&GetPixelAverage(&*pixel)) {255} else {0};
         *pixel = image::Rgba::from([px,px,px,pixel[3]]);
     })
 }
@@ -71,19 +90,20 @@ fn SortPixelsInLine(line: &mut Vec<&mut image::Rgba<u8>>, settings : &PixelSorte
     let mut spans : Vec<Vec<usize>> = Vec::new();
 
     for pixel in 0..line.len() {
-        if settings.threshold.contains(&GetPixelLuminance(&*line[pixel])) {
+        if settings.threshold.contains(&GetPixelAverage(&*line[pixel])) {
             currentSpan.push(pixel);
         }
         else if !currentSpan.is_empty() {
             spans.push(std::mem::take(&mut currentSpan));
         }
     }
+    if !currentSpan.is_empty() { spans.push(std::mem::take(&mut currentSpan)); }
 
     let mut transformations : Vec<(usize, usize)> = Vec::new();
     for span in spans.iter_mut() {
         let presortSpan = span.clone();
         // each span is a list of indices into line, not pixel values
-        span.sort_unstable_by(|a, b| { GetPixelSortingNumber(&*line[*a], settings).cmp(&GetPixelSortingNumber(&*line[*b], settings)) });
+        span.sort_unstable_by(|a, b| { GetPixelSortingNumber(&*line[*a], settings).partial_cmp(&GetPixelSortingNumber(&*line[*b], settings)).unwrap_or(std::cmp::Ordering::Equal) });
         for i in 0..span.len() {
             transformations.push((presortSpan[i], span[i]));
         }
@@ -99,69 +119,83 @@ fn SortPixelsInLine(line: &mut Vec<&mut image::Rgba<u8>>, settings : &PixelSorte
     }
 }
 
-fn GetPixelLuminance(pixel: &image::Rgba<u8>) -> u8 {
+/// Returns the number that a pixel should be sorted by.
+fn GetPixelSortingNumber(pixel: &image::Rgba<u8>, settings : &PixelSorterSettings) -> f32 {
+    match settings.sortMode {
+        SortMode::Red => {
+            return pixel[0] as f32;
+        },
+        SortMode::Green => {
+            return pixel[1] as f32;
+        },
+        SortMode::Blue => {
+            return pixel[2] as f32;
+        },
+        SortMode::Hue => {
+            return GetPixelHue(pixel);
+        },
+        SortMode::Saturation => {
+            return GetPixelSaturation(pixel);
+        },
+        SortMode::Lightness => {
+            return GetPixelLightness(pixel);
+        }
+        _ => {
+            return GetPixelAverage(pixel) as f32;
+        }
+    }
+}
+
+fn GetPixelAverage(pixel: &image::Rgba<u8>) -> u8 {
     // don't consider alpha
     // cast to u32 to stop overflows
     return ((pixel[0] as u32 + pixel[1] as u32 + pixel[2] as u32) / 3) as u8;
 }
 
-/// Returns the number that a pixel should be sorted by.
-fn GetPixelSortingNumber(pixel: &image::Rgba<u8>, settings : &PixelSorterSettings) -> u32 {
-    match settings.sortMode {
-        SortMode::Red => {
-            return pixel[0] as u32;
-        },
-        SortMode::Green => {
-            return pixel[1] as u32;
-        },
-        SortMode::Blue => {
-            return pixel[2] as u32;
-        },
-        SortMode::Hue => {
-            let hsl = rgba_to_hsl(pixel);
-            return hsl.0;
-        },
-        SortMode::Saturation => {
-            let hsl = rgba_to_hsl(pixel);
-            return hsl.1;
-        },
-        _ => {
-            let hsl = rgba_to_hsl(pixel);
-            return hsl.2;
-        }
+// adapted from https://en.wikipedia.org/wiki/HSL_and_HSV
+
+fn GetPixelHue(pixel: &image::Rgba<u8>) -> f32 {
+    let max = pixel[0].max(pixel[1]).max(pixel[2]) as f32 / 255.0;
+    let min = pixel[0].min(pixel[1]).min(pixel[2]) as f32 / 255.0;
+
+    if max == min { return 0.0; }
+
+    let r = pixel[0] as f32 / 255.0;
+    let g = pixel[1] as f32 / 255.0;
+    let b = pixel[2] as f32 / 255.0;
+    
+    let mut h : f32 = 0.0;
+
+    // red is max
+    if max == r {
+        h = ((g - b) / (max - min)).rem_euclid(6.0);
     }
+
+    // green is max
+    else if max == g {
+        h = 2.0 + (b - r) / (max - min);
+    }
+
+    // blue is max
+    else if max == b {
+        h = 4.0 + (r - g) / (max - min);
+    }
+
+    return h * 60.0;
 }
 
-fn rgba_to_hsl(rgba: &image::Rgba<u8>) -> (u32, u32, u32) {
-    // Normalize R, G, and B values to the range 0..1
-    let r = rgba.0[0] as f32 / 255.0;
-    let g = rgba.0[1] as f32 / 255.0;
-    let b = rgba.0[2] as f32 / 255.0;
+fn GetPixelSaturation(pixel: &image::Rgba<u8>) -> f32 {
+    let max = pixel[0].max(pixel[1]).max(pixel[2]) as f32 / 255.0;
+    let min = pixel[0].min(pixel[1]).min(pixel[2]) as f32 / 255.0;
 
-    // Find the maximum and minimum values of R, G, and B
-    let cmax = r.max(g).max(b);
-    let cmin = r.min(g).min(b);
-    let delta = cmax - cmin;
+    let lightness = GetPixelLightness(pixel) / 100.0;
+    if lightness == 0.0 { return 0.0 }
 
-    // Calculate H, S, and L
-    let h = if delta == 0.0 {
-        0.0
-    } else if cmax == r {
-        60.0 * ((g - b) / delta % 6.0)
-    } else if cmax == g {
-        60.0 * ((b - r) / delta + 2.0)
-    } else {
-        60.0 * ((r - g) / delta + 4.0)
-    };
-    let l = 0.5 * (cmax + cmin);
-    let s = if delta == 0.0 {
-        0.0
-    } else {
-        delta / (1.0 - (2.0 * l - 1.0).abs())
-    };
-
-    // Return the values as a tuple
-    (h as u32, (s * 100.0) as u32, (l * 100.0) as u32)
+    return (max - min) / (1.0 - (2.0 * lightness - 1.0).abs()) * 100.0;
 }
 
-
+fn GetPixelLightness(pixel: &image::Rgba<u8>) -> f32 {
+    let min = pixel[0].max(pixel[1]).max(pixel[2]) as f32 / 255.0;
+    let max = pixel[0].min(pixel[1]).min(pixel[2]) as f32 / 255.0;
+    return (min + max) / 2.0 * 100.0;
+}

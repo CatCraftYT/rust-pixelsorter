@@ -47,23 +47,23 @@ impl eframe::App for PixelSorter {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         egui::TopBottomPanel::top("menu_bar").show(ctx, |ui| {
             egui::menu::bar(ui, |ui| {
-                ui.menu_button("File", |ui| {
-                    if ui.button("Save").clicked() && self.processedImage.is_some() {
-                        let path = GetSavePath();
-                        if path.is_some() {
-                            self.processedImage.as_ref().unwrap().save(path.unwrap());
-                        }
+                if ui.button("Open").clicked() {
+                    let img = OpenImgFileWithDialog();
+                    if img.is_some() {
+                        self.originalImageBytes = img;
+                        self.processedImage = self.originalImageBytes.clone();
+                        self.UpdateImage(ctx);
                     }
+                }
 
-                    if ui.button("Open").clicked() {
-                        let img = OpenImgFileWithDialog();
-                        if img.is_some() {
-                            self.originalImageBytes = img;
-                            self.processedImage = self.originalImageBytes.clone();
-                            self.UpdateImage(ctx);
-                        }
+                if ui.button("Save").clicked() && self.processedImage.is_some() {
+                    let path = GetSavePath();
+                    if path.is_some() {
+                        self.processedImage.as_ref().unwrap().save(path.unwrap());
                     }
+                }
 
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     if ui.button("Quit").clicked() {
                         _frame.close();
                     }
@@ -80,6 +80,7 @@ impl eframe::App for PixelSorter {
                 egui::ComboBox::from_label("Sorting mode")
                 .selected_text(format!("{:?}", self.settings.sortMode))
                 .show_ui(ui, |ui| {
+                    ui.selectable_value(&mut self.settings.sortMode, crate::sorter::SortMode::Average, "Average");
                     ui.selectable_value(&mut self.settings.sortMode, crate::sorter::SortMode::Red, "Red");
                     ui.selectable_value(&mut self.settings.sortMode, crate::sorter::SortMode::Green, "Green");
                     ui.selectable_value(&mut self.settings.sortMode, crate::sorter::SortMode::Blue, "Blue");
@@ -90,8 +91,8 @@ impl eframe::App for PixelSorter {
 
                 ui.separator();
                 
-                ui.add(egui::Slider::new(&mut self.settings.threshold.end, self.settings.threshold.start..=255).clamp_to_range(true).text("Threshold max"));
-                ui.add(egui::Slider::new(&mut self.settings.threshold.start, 0..=self.settings.threshold.end).clamp_to_range(true).text("Threshold min"));
+                ui.add(egui::Slider::new(&mut self.settings.threshold.max, self.settings.threshold.min..=255).clamp_to_range(true).text("Threshold max"));
+                ui.add(egui::Slider::new(&mut self.settings.threshold.min, 0..=self.settings.threshold.max).clamp_to_range(true).text("Threshold min"));
 
                 ui.horizontal(|ui| {
                     if ui.checkbox(&mut self.settings.showThresholds, "Show thresholds").on_hover_text("Show the thresholds for sorting. Rows of white pixels will be sorted, black pixels will not be affected.").changed() {
