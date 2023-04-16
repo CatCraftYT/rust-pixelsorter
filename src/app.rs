@@ -116,12 +116,16 @@ impl eframe::App for PixelSorter {
                         }
                         self.UpdateImage(ctx);
                     };
+
                     ui.separator();
-                    if ui.button("Update").clicked() && self.settings.showThresholds {
-                        self.processedImage = self.originalImageBytes.clone();
-                        crate::sorter::ThresholdImage(self.processedImage.as_mut().unwrap(), &self.settings);
-                        self.UpdateImage(ctx);
-                    }
+
+                    ui.add_enabled_ui(self.settings.showThresholds, |ui| {
+                        if ui.button("Update").clicked() && self.settings.showThresholds {
+                            self.processedImage = self.originalImageBytes.clone();
+                            crate::sorter::ThresholdImage(self.processedImage.as_mut().unwrap(), &self.settings);
+                            self.UpdateImage(ctx);
+                        }
+                    });
                 });
 
                 ui.separator();
