@@ -45,6 +45,8 @@ impl PixelSorter {
 
 impl eframe::App for PixelSorter {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        if self.processedImage.is_some() && self.displayedImage.is_none() { self.UpdateImage(ctx); }
+
         egui::TopBottomPanel::top("menu_bar").show(ctx, |ui| {
             egui::menu::bar(ui, |ui| {
                 if ui.button("Open").clicked() {
@@ -98,7 +100,7 @@ impl eframe::App for PixelSorter {
                     });
                 });
 
-                ui.checkbox(&mut self.settings.invert, "Invert sorting direction").on_hover_text("If this is unchecked, pixels will be sorted darkest to lightest. If it is checked, they will be sorted lightest to darkest.");
+                ui.checkbox(&mut self.settings.invert, "Invert sorting order").on_hover_text("If this is unchecked, pixels will be sorted darkest to lightest. If it is checked, they will be sorted lightest to darkest.");
 
                 ui.separator();
                 
@@ -163,6 +165,18 @@ impl eframe::App for PixelSorter {
             }
         });
 
+        // https://github.com/emilk/egui/blob/8ce0e1c5206780e76234842b94ceb0edf5bb8b75/examples/file_dialog/src/main.rs#L67
+        ctx.input(|input| {
+            if !input.raw.dropped_files.is_empty() {
+                let img = OpenImgFile(input.raw.dropped_files[0].path.as_ref().unwrap());
+                if img.is_some() {
+                    self.originalImageBytes = img;
+                    self.processedImage = self.originalImageBytes.clone();
+                    self.displayedImage = None;
+                }
+            }
+        });
+
     }
 }
 
@@ -173,7 +187,11 @@ fn OpenImgFileWithDialog() -> Option<image::DynamicImage> {
 
     if path.is_none() { return None; }
 
-    let image = ImageReader::open(path.unwrap()).unwrap().decode();
+    return OpenImgFile(&path.unwrap());
+}
+
+fn OpenImgFile(path: &std::path::PathBuf) -> Option<image::DynamicImage> {
+    let image = ImageReader::open(path).unwrap().decode();
     if image.is_err() {
         return None;
     }
