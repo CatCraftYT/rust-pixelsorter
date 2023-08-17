@@ -143,6 +143,11 @@ impl eframe::App for PixelSorter {
                     self.processedImage = self.originalImageBytes.clone();
                     self.UpdateImage(ctx);
                 }
+
+                let loopbackButton = egui::Button::new("Apply sorting");
+                if ui.add_sized(egui::vec2(ui.available_width(), 10.0), loopbackButton).on_hover_text("Apply the current sorting, so that the next sort will use the current image instead of the original.").clicked() {
+                    self.originalImageBytes = self.processedImage.clone();
+                }
             });
 
             ui.with_layout(egui::Layout::bottom_up(egui::Align::LEFT), |ui| {
